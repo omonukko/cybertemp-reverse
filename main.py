@@ -3,19 +3,14 @@ import time
 import json
 import gzip
 import base64
-import curl_cffi
-import base64
-import json
-import time
 import random
 import os
 import hashlib
-import itertools
 import string
+import curl_cffi
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 from Crypto.Hash import SHA256
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 public_key = """-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAh6p66pVDFDfd+MRPa22g
@@ -33,21 +28,16 @@ def encrypt_payload(json_str: str):
     ct = cipher.encrypt(json_str.encode())
     return base64.b64encode(ct).decode()
 
-def generate_challenge() -> dict:
-    difficulty = random.randint(5, 6)
+def generate_challenge():
     salt_length = random.randint(8, 11)
-    iterations = random.randint(1, 2)
     raw_salt = os.urandom(salt_length)
-    salt_b64 = base64.b64encode(raw_salt).decode()
-    prefix_raw = hashlib.sha256(raw_salt).digest()
-    prefix_b64 = base64.b64encode(prefix_raw).decode()
     return {
-        "salt": salt_b64,
-        "prefix": prefix_b64,
+        "salt": base64.b64encode(raw_salt).decode(),
+        "prefix": base64.b64encode(hashlib.sha256(raw_salt).digest()).decode(),
         "config": {
-            "difficulty": difficulty,
+            "difficulty": random.randint(5, 6),
             "salt_length": salt_length,
-            "iterations": iterations
+            "iterations": random.randint(1, 2)
         }
     }
 
@@ -65,11 +55,13 @@ def solve_pow(prefix: str, difficulty: int, max_iter: int = 5_000_000):
     raise RuntimeError("PoW challenge timeout")
 
 def cookie():
+    st = time.time()
     chal = generate_challenge()
     chal["createdAt"] = int(time.time() * 1000)
     chal_json = json.dumps(chal, separators=(",", ":"))
     encrypted_chal = encrypt_payload(chal_json)
     request_id = "".join(random.choices(string.ascii_letters + string.digits, k=8)) + str(int(time.time() * 1000))
+    print(f"Challenge: {chal}")
     sol_payload = solve_pow(chal["prefix"], chal["config"]["difficulty"])
     sol_obj = {
         "nonce": sol_payload["nonce"],
@@ -78,7 +70,9 @@ def cookie():
     }
     sol_json = json.dumps(sol_obj, separators=(",", ":"))
     encrypted_sol = encrypt_payload(sol_json)
+    #print(f"Encrypted Solution: {encrypted_sol}")
     bp = f"{encrypted_chal}|{encrypted_sol}"
+    print(f"bp: {encrypted_chal[:20]}|{encrypted_sol[:20]} elapsed={time.time() - st:.1f}s.")
     return bp
 
 payload = {
