@@ -56,7 +56,7 @@ def solve_pow(prefix: str, difficulty: int, max_iter: int = 5_000_000):
     target = "0" * difficulty
     for _ in range(max_iter):
         nonce = "".join(random.choices(alphabet, k=8))
-        h     = hashlib.sha256((prefix + nonce).encode()).hexdigest()
+        h = hashlib.sha256((prefix + nonce).encode()).hexdigest()
         if h.startswith(target):
             return {
                 "nonce": nonce,
